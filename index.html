@@ -190,6 +190,24 @@
                 </div>
             </div>
         </section>
+
+        <footer class="landing-footer">
+            <div class="footer-brand">
+                <strong>TRACE</strong>
+                <p>Every room leaves a trace. Built as a playable AI mystery product for a hackathon submission.</p>
+            </div>
+            <div class="footer-links" aria-label="Footer navigation">
+                <a href="#workflow">Core Loop</a>
+                <a href="#experience">Experience</a>
+                <a href="#platform">Modes</a>
+                <button class="launch-app" type="button" onclick="document.body.classList.add('app-mode'); history.pushState(null, '', '#app'); window.scrollTo({ top: 0, behavior: 'smooth' });">Start Demo</button>
+            </div>
+            <div class="footer-meta">
+                <span>Room scan</span>
+                <span>AI witness</span>
+                <span>Evidence file</span>
+            </div>
+        </footer>
     </section>
 
     <div class="app-shell">

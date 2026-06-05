@@ -459,6 +459,74 @@
             margin-top: 26px;
         }
 
+        .landing-footer {
+            width: min(1200px, calc(100% - 36px));
+            margin: 0 auto;
+            padding: 28px 0 34px;
+            border-top: 1px solid rgba(255,255,255,.14);
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) auto minmax(0, .8fr);
+            gap: 24px;
+            align-items: center;
+        }
+
+        .footer-brand strong {
+            display: block;
+            color: var(--accent);
+            font-size: 1.05rem;
+            font-weight: 900;
+        }
+
+        .footer-brand p {
+            max-width: 460px;
+            margin: 8px 0 0;
+            color: var(--muted);
+            line-height: 1.45;
+            font-size: .92rem;
+        }
+
+        .footer-links,
+        .footer-meta {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .footer-links {
+            justify-content: center;
+        }
+
+        .footer-links a,
+        .footer-links button {
+            color: var(--soft);
+            background: transparent;
+            text-decoration: none;
+            font-weight: 800;
+            font-size: .88rem;
+        }
+
+        .footer-links a:hover,
+        .footer-links button:hover {
+            color: var(--accent);
+        }
+
+        .footer-meta {
+            justify-content: flex-end;
+            color: var(--muted);
+            font-size: .82rem;
+        }
+
+        .footer-meta span {
+            min-height: 26px;
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 0 9px;
+            border: 1px solid rgba(255,255,255,.12);
+            background: rgba(255,255,255,.04);
+        }
+
         .app-shell {
             min-height: 100vh;
             display: none;
@@ -1401,6 +1469,18 @@
             .mode-grid {
                 grid-template-columns: 1fr;
                 padding: 0 14px 18px;
+            }
+
+            .landing-footer {
+                width: calc(100% - 28px);
+                grid-template-columns: 1fr;
+                gap: 18px;
+                padding: 26px 0 32px;
+            }
+
+            .footer-links,
+            .footer-meta {
+                justify-content: flex-start;
             }
 
             .topbar {
