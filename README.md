@@ -26,16 +26,26 @@ The investigation app covers the full MVP loop:
 - Submit an accusation
 - Reveal the truth and generate a case file
 
+## Project Structure
+
+```text
+index.html          Landing page and app markup
+styles.css          Visual design and responsive layout
+app.js              Frontend game logic and camera flow
+backend/server.py   Local backend API and static file server
+assets/             Generated product visuals
+```
+
 ## Run
 
-Open `index.html` in a browser, or serve the folder locally:
+Run the backend server:
 
 ```bash
-python3 -m http.server 8000
+python3 backend/server.py
 ```
 
 Then visit `http://localhost:8000`.
 
 ## Current Prototype
 
-This version uses frontend-only procedural logic so the concept can be tested immediately without API keys, backend setup, or database configuration. It includes generated visual assets, a four-screen landing page, and the playable investigation experience. The next production step is to replace the procedural engines with structured AI calls, camera vision, persistent case state, and real case-file storage.
+This version uses a lightweight Python backend with no external dependencies. The backend serves the app, returns camera-scan object inventory, and generates room-based mystery cases. It includes generated visual assets, a four-screen landing page, and the playable investigation experience. The next production step is to replace the procedural backend engines with structured AI calls, stronger camera vision, persistent case state, and real case-file storage.
