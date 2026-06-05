@@ -89,27 +89,6 @@
             letter-spacing: 0;
         }
 
-        .landing-links {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .landing-links a,
-        .landing-links button {
-            min-height: 36px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0 12px;
-            border-radius: 999px;
-            color: var(--text);
-            text-decoration: none;
-            background: rgba(255,255,255,.07);
-            border: 1px solid rgba(255,255,255,.14);
-            backdrop-filter: blur(12px);
-        }
-
         .landing-content {
             width: min(1040px, 100%);
             padding: 104px clamp(18px, 5vw, 70px) 78px;
@@ -1374,11 +1353,6 @@
                 align-items: flex-start;
                 flex-direction: column;
                 padding: 16px 14px;
-            }
-
-            .landing-links {
-                width: 100%;
-                overflow-x: auto;
             }
 
             .landing-content {
