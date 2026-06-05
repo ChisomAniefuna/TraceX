@@ -63,6 +63,9 @@
             previewImage: document.getElementById("previewImage"),
             scanStatus: document.getElementById("scanStatus"),
             scanNote: document.getElementById("scanNote"),
+            cameraPrompt: document.getElementById("cameraPrompt"),
+            cameraPromptTitle: document.getElementById("cameraPromptTitle"),
+            cameraPromptBody: document.getElementById("cameraPromptBody"),
             inventoryChips: document.getElementById("inventoryChips"),
             objectInput: document.getElementById("objectInput"),
             objectCount: document.getElementById("objectCount"),
@@ -150,6 +153,12 @@
             els.toast.classList.add("active");
             window.clearTimeout(showToast.timer);
             showToast.timer = window.setTimeout(() => els.toast.classList.remove("active"), 2200);
+        }
+
+        function setCameraPrompt(status, title, body) {
+            els.cameraPrompt.className = `camera-prompt ${status || ""}`.trim();
+            els.cameraPromptTitle.textContent = title;
+            els.cameraPromptBody.textContent = body;
         }
 
         function openApp(updateHash = true) {
@@ -565,6 +574,13 @@
             els.scanNote.textContent = state.scanned
                 ? `${state.scanSource} captured ${state.inventory.length} possible evidence objects. Generate a case or add anything the scan missed.`
                 : "Enter your name, then start a camera scan. Trace will capture the room and reveal objects as evidence candidates.";
+            setCameraPrompt(
+                state.scanned ? "success" : "ready",
+                state.scanned ? "Room scan complete" : "Camera briefing",
+                state.scanned
+                    ? "Trace has enough room evidence for this case. Re-scan any time if the scene changes."
+                    : "When your browser asks, choose Allow so Trace can scan the room you are standing in."
+            );
             document.getElementById("generateBtn").disabled = !state.scanned;
             els.objectInput.disabled = !state.scanned;
             document.getElementById("addObjectBtn").disabled = !state.scanned;
@@ -696,6 +712,43 @@
             await waitForCameraReady();
         }
 
+        function describeCameraError(error) {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                return {
+                    title: "Camera unavailable",
+                    body: "This browser cannot access the camera. Open Trace on localhost in a modern browser, then try again."
+                };
+            }
+            if (error && error.name === "NotAllowedError") {
+                return {
+                    title: "Turn on camera permission",
+                    body: "Allow camera access for localhost, then press Try Camera Again. If macOS blocks it, enable camera access for your browser in System Settings."
+                };
+            }
+            if (error && error.name === "NotFoundError") {
+                return {
+                    title: "No camera found",
+                    body: "Connect a camera or switch to a device with a camera, then try the scan again."
+                };
+            }
+            if (error && error.name === "NotReadableError") {
+                return {
+                    title: "Camera is busy",
+                    body: "Another app is using the camera. Close that app, then press Try Camera Again."
+                };
+            }
+            if (error && error.name === "SecurityError") {
+                return {
+                    title: "Browser blocked the scan",
+                    body: "Use http://localhost:8000 and allow camera access in your browser site settings."
+                };
+            }
+            return {
+                title: "Camera permission needed",
+                body: error && error.message ? error.message : "Camera permission was blocked or unavailable. Turn it on, then try again."
+            };
+        }
+
         async function scanRoom() {
             const name = validatePlayerName();
             if (!name) return;
@@ -703,6 +756,7 @@
             els.sceneFrame.classList.add("scanning");
             els.scanStatus.textContent = "Requesting camera...";
             els.scanNote.textContent = "Allow camera access so Trace can scan your actual room.";
+            setCameraPrompt("active", "Permission request sent", "Look for the browser camera prompt and choose Allow. Trace will begin scanning as soon as permission is granted.");
             document.getElementById("scanBtn").disabled = true;
             document.getElementById("scanBtn").textContent = "Requesting...";
             setStep("scan");
@@ -711,6 +765,7 @@
                 await requestCameraStream();
                 els.scanStatus.textContent = "Scanning room...";
                 els.scanNote.textContent = `Hold steady, ${name}. Trace is looking for evidence objects in the room.`;
+                setCameraPrompt("active", "Camera live", "Keep the room in view for a moment while Trace captures possible evidence objects.");
                 document.getElementById("scanBtn").textContent = "Scanning...";
 
                 await new Promise(resolve => window.setTimeout(resolve, 1700));
@@ -744,12 +799,14 @@
                     state.stream.getTracks().forEach(track => track.stop());
                     state.stream = null;
                 }
+                const cameraMessage = describeCameraError(error);
                 els.sceneFrame.classList.remove("scanning");
                 document.getElementById("scanBtn").disabled = false;
-                document.getElementById("scanBtn").textContent = "Request Camera + Scan";
+                document.getElementById("scanBtn").textContent = "Try Camera Again";
                 els.scanStatus.textContent = "Camera needed";
-                els.scanNote.textContent = "Trace needs camera permission to scan the room. Grant access and try again.";
-                showToast(error.message || "Camera permission was blocked or unavailable.");
+                els.scanNote.textContent = cameraMessage.body;
+                setCameraPrompt("error", cameraMessage.title, cameraMessage.body);
+                showToast(cameraMessage.title);
             }
         }
 
@@ -1017,8 +1074,9 @@
             els.camera.classList.remove("active");
             els.sceneFrame.classList.remove("has-media", "scanning");
             document.getElementById("scanBtn").disabled = false;
-            document.getElementById("scanBtn").textContent = "Start Scan";
+            document.getElementById("scanBtn").textContent = "Request Camera + Scan";
             els.scanNote.textContent = "Enter your name, then start a camera scan. Trace will capture the room and reveal objects as evidence candidates.";
+            setCameraPrompt("ready", "Camera briefing", "When your browser asks, choose Allow so Trace can scan the room you are standing in.");
             setStep("scan");
             renderAll();
             showToast("Room reset.");
