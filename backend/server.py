@@ -11,7 +11,7 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[1]
 HOST = "127.0.0.1"
 PORT = 8000
-OPENAI_VISION_MODEL = os.environ.get("OPENAI_VISION_MODEL", "gpt-4.1-mini")
+GEMINI_VISION_MODEL = os.environ.get("GEMINI_VISION_MODEL", "gemini-2.5-flash")
 
 DETECTABLE_OBJECTS = [
     "desk",
@@ -197,14 +197,13 @@ def procedural_detect_objects(payload):
     return unique(detected)[:10]
 
 
-def extract_response_text(response):
-    if response.get("output_text"):
-        return response["output_text"]
+def extract_gemini_response_text(response):
     chunks = []
-    for item in response.get("output", []):
-        for content in item.get("content", []):
-            if content.get("type") in ["output_text", "text"] and content.get("text"):
-                chunks.append(content["text"])
+    for candidate in response.get("candidates", []):
+        content = candidate.get("content") or {}
+        for part in content.get("parts", []):
+            if part.get("text"):
+                chunks.append(part["text"])
     return "\n".join(chunks).strip()
 
 
@@ -234,11 +233,18 @@ def normalize_detected_objects(values):
     return unique(objects)[:12]
 
 
-def openai_detect_objects(payload):
-    api_key = os.environ.get("OPENAI_API_KEY")
+def split_data_url(data_url):
+    header, encoded = data_url.split(",", 1)
+    mime_type = header.split(";")[0].replace("data:", "") or "image/jpeg"
+    return mime_type, encoded
+
+
+def gemini_detect_objects(payload):
+    api_key = os.environ.get("GEMINI_API_KEY")
     image_data_url = payload.get("imageDataUrl")
     if not api_key or not image_data_url or not image_data_url.startswith("data:image/"):
         return None
+    mime_type, image_base64 = split_data_url(image_data_url)
 
     prompt = (
         "You are TRACE's room scanner. Analyze the room photo and return only strict JSON with "
@@ -248,22 +254,29 @@ def openai_detect_objects(payload):
         "that could become mystery evidence."
     )
     request_body = {
-        "model": OPENAI_VISION_MODEL,
-        "input": [
+        "contents": [
             {
-                "role": "user",
-                "content": [
-                    {"type": "input_text", "text": prompt},
-                    {"type": "input_image", "image_url": image_data_url, "detail": "low"},
+                "parts": [
+                    {
+                        "inline_data": {
+                            "mime_type": mime_type,
+                            "data": image_base64,
+                        }
+                    },
+                    {"text": prompt},
                 ],
             }
         ],
+        "generationConfig": {
+            "temperature": 0.2,
+            "responseMimeType": "application/json",
+        },
     }
     request = urllib.request.Request(
-        "https://api.openai.com/v1/responses",
+        f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_VISION_MODEL}:generateContent",
         data=json.dumps(request_body).encode("utf-8"),
         headers={
-            "Authorization": f"Bearer {api_key}",
+            "x-goog-api-key": api_key,
             "Content-Type": "application/json",
         },
         method="POST",
@@ -271,22 +284,22 @@ def openai_detect_objects(payload):
     with urllib.request.urlopen(request, timeout=25) as response:
         data = json.loads(response.read().decode("utf-8"))
 
-    parsed = parse_json_text(extract_response_text(data))
+    parsed = parse_json_text(extract_gemini_response_text(data))
     objects = normalize_detected_objects(parsed.get("objects"))
     if len(objects) < 3:
         return None
     return {
         "objects": objects,
-        "source": "openai",
+        "source": "gemini",
         "sceneSummary": str(parsed.get("sceneSummary") or "").strip()[:240],
         "clueCandidates": normalize_detected_objects(parsed.get("clueCandidates"))[:5],
-        "model": OPENAI_VISION_MODEL,
+        "model": GEMINI_VISION_MODEL,
     }
 
 
 def detect_scan(payload):
     try:
-        vision_result = openai_detect_objects(payload)
+        vision_result = gemini_detect_objects(payload)
         if vision_result:
             return vision_result
     except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError, OSError, ValueError):

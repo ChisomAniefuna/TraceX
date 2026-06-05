@@ -828,8 +828,8 @@
                     pick(EXTRA_OBJECTS, seed, 3)
                 ];
                 state.inventory = unique([...detected, ...additions]).slice(0, 10);
-                state.scanSource = backendScan && backendScan.source === "openai"
-                    ? `${name}'s OpenAI vision scan`
+                state.scanSource = backendScan && backendScan.source === "gemini"
+                    ? `${name}'s Gemini vision scan`
                     : `${name}'s camera scan`;
                 state.scanTime = new Date();
                 state.scanned = true;
@@ -837,8 +837,8 @@
                 document.getElementById("scanBtn").disabled = false;
                 document.getElementById("scanBtn").textContent = "Re-scan Room";
                 renderAll();
-                showToast(backendScan && backendScan.source === "openai"
-                    ? `${state.inventory.length} room objects detected with OpenAI Vision.`
+                showToast(backendScan && backendScan.source === "gemini"
+                    ? `${state.inventory.length} room objects detected with Gemini Vision.`
                     : `${state.inventory.length} room objects detected.`);
             } catch (error) {
                 stopCameraStream("Permission still off");

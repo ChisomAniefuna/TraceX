@@ -46,23 +46,23 @@ python3 backend/server.py
 
 Then visit `http://localhost:8000`.
 
-## OpenAI Vision Setup
+## Gemini Vision Setup
 
-TRACE can use OpenAI Vision for real room object detection. Add your API key as an environment variable before starting the backend:
+TRACE can use Gemini Vision for real room object detection. Add your Gemini API key as an environment variable before starting the backend:
 
 ```bash
-export OPENAI_API_KEY="your_api_key_here"
+export GEMINI_API_KEY="your_api_key_here"
 python3 backend/server.py
 ```
 
 Optional: choose a different vision-capable model:
 
 ```bash
-export OPENAI_VISION_MODEL="gpt-4.1-mini"
+export GEMINI_VISION_MODEL="gemini-2.5-flash"
 ```
 
-Do not commit your API key. The app falls back to the procedural demo scanner when `OPENAI_API_KEY` is not set.
+Do not commit your API key. The app falls back to the procedural demo scanner when `GEMINI_API_KEY` is not set.
 
 ## Current Prototype
 
-This version uses a lightweight Python backend with no external dependencies. The backend serves the app, can return OpenAI Vision object inventory when configured, and generates room-based mystery cases. It includes generated visual assets, a four-screen landing page, and the playable investigation experience. The next production step is to replace more procedural backend engines with structured AI calls, persistent case state, and real case-file storage.
+This version uses a lightweight Python backend with no external dependencies. The backend serves the app, can return Gemini Vision object inventory when configured, and generates room-based mystery cases. It includes generated visual assets, a four-screen landing page, and the playable investigation experience. The next production step is to replace more procedural backend engines with structured AI calls, persistent case state, and real case-file storage.
