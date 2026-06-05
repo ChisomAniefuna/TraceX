@@ -735,6 +735,88 @@
             margin-top: 12px;
         }
 
+        .camera-toggle {
+            min-height: 58px;
+            margin-top: 12px;
+            padding: 10px 12px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: rgba(255,255,255,.035);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            cursor: pointer;
+        }
+
+        .camera-toggle span {
+            min-width: 0;
+        }
+
+        .camera-toggle strong,
+        .camera-toggle small {
+            display: block;
+        }
+
+        .camera-toggle strong {
+            color: var(--text);
+            font-size: .9rem;
+        }
+
+        .camera-toggle small {
+            margin-top: 3px;
+            color: var(--muted);
+            line-height: 1.25;
+        }
+
+        .camera-toggle input {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .camera-toggle i {
+            flex: 0 0 auto;
+            width: 48px;
+            height: 28px;
+            padding: 3px;
+            border: 1px solid rgba(255,255,255,.18);
+            border-radius: 999px;
+            background: #101318;
+            transition: border-color .2s ease, background .2s ease;
+        }
+
+        .camera-toggle i::before {
+            content: "";
+            display: block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--muted);
+            transition: transform .2s ease, background .2s ease;
+        }
+
+        .camera-toggle input:checked + i {
+            border-color: rgba(118, 184, 147, .62);
+            background: rgba(118, 184, 147, .18);
+        }
+
+        .camera-toggle input:checked + i::before {
+            transform: translateX(20px);
+            background: #95d3ab;
+        }
+
+        .camera-toggle input:focus-visible + i {
+            box-shadow: 0 0 0 3px rgba(113, 167, 217, .2);
+        }
+
+        .camera-toggle:has(input:disabled) {
+            cursor: wait;
+            opacity: .72;
+        }
+
         .camera-prompt {
             margin-top: 10px;
             padding: 11px 12px;

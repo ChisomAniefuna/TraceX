@@ -66,6 +66,8 @@
             cameraPrompt: document.getElementById("cameraPrompt"),
             cameraPromptTitle: document.getElementById("cameraPromptTitle"),
             cameraPromptBody: document.getElementById("cameraPromptBody"),
+            cameraToggle: document.getElementById("cameraToggle"),
+            cameraToggleText: document.getElementById("cameraToggleText"),
             inventoryChips: document.getElementById("inventoryChips"),
             objectInput: document.getElementById("objectInput"),
             objectCount: document.getElementById("objectCount"),
@@ -159,6 +161,12 @@
             els.cameraPrompt.className = `camera-prompt ${status || ""}`.trim();
             els.cameraPromptTitle.textContent = title;
             els.cameraPromptBody.textContent = body;
+        }
+
+        function syncCameraToggle(enabled, label) {
+            els.cameraToggle.checked = enabled;
+            els.cameraToggle.disabled = false;
+            els.cameraToggleText.textContent = label || (enabled ? "On and ready to scan" : "Off until you turn it on");
         }
 
         function openApp(updateHash = true) {
@@ -670,6 +678,10 @@
             return unique(detected).slice(0, 9);
         }
 
+        function hasActiveCameraStream() {
+            return state.stream && state.stream.getTracks().some(track => track.readyState === "live");
+        }
+
         function captureCameraFrame() {
             if (!state.stream || !els.camera.videoWidth || !els.camera.videoHeight) {
                 return null;
@@ -689,6 +701,7 @@
             els.camera.classList.remove("active");
             state.stream.getTracks().forEach(track => track.stop());
             state.stream = null;
+            syncCameraToggle(false, "Off after capture");
             state.scanSource = "Camera frame";
             return signature;
         }
@@ -710,6 +723,20 @@
             els.sceneFrame.classList.add("has-media");
             state.scanSource = "Live camera";
             await waitForCameraReady();
+            syncCameraToggle(true, "On and ready to scan");
+        }
+
+        function stopCameraStream(label = "Camera switched off") {
+            if (state.stream) {
+                state.stream.getTracks().forEach(track => track.stop());
+                state.stream = null;
+            }
+            els.camera.srcObject = null;
+            els.camera.classList.remove("active");
+            if (!els.previewImage.classList.contains("active")) {
+                els.sceneFrame.classList.remove("has-media");
+            }
+            syncCameraToggle(false, label);
         }
 
         function describeCameraError(error) {
@@ -754,15 +781,25 @@
             if (!name) return;
 
             els.sceneFrame.classList.add("scanning");
-            els.scanStatus.textContent = "Requesting camera...";
-            els.scanNote.textContent = "Allow camera access so Trace can scan your actual room.";
-            setCameraPrompt("active", "Permission request sent", "Look for the browser camera prompt and choose Allow. Trace will begin scanning as soon as permission is granted.");
+            els.scanStatus.textContent = hasActiveCameraStream() ? "Camera ready" : "Requesting camera...";
+            els.scanNote.textContent = hasActiveCameraStream()
+                ? "Camera is on. Trace is about to capture your room."
+                : "Allow camera access so Trace can scan your actual room.";
+            setCameraPrompt(
+                "active",
+                hasActiveCameraStream() ? "Camera already on" : "Permission request sent",
+                hasActiveCameraStream()
+                    ? "Trace will use the live camera feed you turned on."
+                    : "Look for the browser camera prompt and choose Allow. Trace will begin scanning as soon as permission is granted."
+            );
             document.getElementById("scanBtn").disabled = true;
-            document.getElementById("scanBtn").textContent = "Requesting...";
+            document.getElementById("scanBtn").textContent = hasActiveCameraStream() ? "Scanning..." : "Requesting...";
             setStep("scan");
 
             try {
-                await requestCameraStream();
+                if (!hasActiveCameraStream()) {
+                    await requestCameraStream();
+                }
                 els.scanStatus.textContent = "Scanning room...";
                 els.scanNote.textContent = `Hold steady, ${name}. Trace is looking for evidence objects in the room.`;
                 setCameraPrompt("active", "Camera live", "Keep the room in view for a moment while Trace captures possible evidence objects.");
@@ -795,10 +832,7 @@
                 renderAll();
                 showToast(`${state.inventory.length} room objects detected.`);
             } catch (error) {
-                if (state.stream) {
-                    state.stream.getTracks().forEach(track => track.stop());
-                    state.stream = null;
-                }
+                stopCameraStream("Permission still off");
                 const cameraMessage = describeCameraError(error);
                 els.sceneFrame.classList.remove("scanning");
                 document.getElementById("scanBtn").disabled = false;
@@ -807,6 +841,43 @@
                 els.scanNote.textContent = cameraMessage.body;
                 setCameraPrompt("error", cameraMessage.title, cameraMessage.body);
                 showToast(cameraMessage.title);
+            }
+        }
+
+        async function toggleCameraAccess(event) {
+            if (!event.target.checked) {
+                stopCameraStream("Off until you turn it on");
+                setCameraPrompt("ready", "Camera switched off", "Turn Camera Access on when you are ready to scan the room.");
+                els.scanStatus.textContent = state.scanned ? "Room context stored" : "Camera off";
+                return;
+            }
+
+            const name = validatePlayerName();
+            if (!name) {
+                syncCameraToggle(false, "Add your name first");
+                return;
+            }
+
+            els.cameraToggle.disabled = true;
+            els.scanStatus.textContent = "Turning camera on...";
+            els.scanNote.textContent = "Trace is asking the browser to turn on your camera.";
+            setCameraPrompt("active", "Turn camera on", "Choose Allow in the browser prompt. If the camera is blocked, enable it in browser or macOS settings, then try again.");
+
+            try {
+                await requestCameraStream();
+                els.scanStatus.textContent = "Camera on";
+                els.scanNote.textContent = `Camera is on, ${name}. Press Request Camera + Scan when the room is in view.`;
+                setCameraPrompt("active", "Camera on", "Live preview is ready. Keep the room in view and start the scan.");
+                document.getElementById("scanBtn").textContent = state.scanned ? "Re-scan Room" : "Scan Room";
+            } catch (error) {
+                stopCameraStream("Permission still off");
+                const cameraMessage = describeCameraError(error);
+                els.scanStatus.textContent = "Camera needed";
+                els.scanNote.textContent = cameraMessage.body;
+                setCameraPrompt("error", cameraMessage.title, cameraMessage.body);
+                showToast(cameraMessage.title);
+            } finally {
+                els.cameraToggle.disabled = false;
             }
         }
 
@@ -1057,10 +1128,7 @@
             state.verdict = null;
             state.scanSource = "No camera scan yet";
             state.scanTime = null;
-            if (state.stream) {
-                state.stream.getTracks().forEach(track => track.stop());
-                state.stream = null;
-            }
+            stopCameraStream("Off until you turn it on");
             if (state.imageUrl) {
                 URL.revokeObjectURL(state.imageUrl);
                 state.imageUrl = "";
@@ -1077,12 +1145,14 @@
             document.getElementById("scanBtn").textContent = "Request Camera + Scan";
             els.scanNote.textContent = "Enter your name, then start a camera scan. Trace will capture the room and reveal objects as evidence candidates.";
             setCameraPrompt("ready", "Camera briefing", "When your browser asks, choose Allow so Trace can scan the room you are standing in.");
+            syncCameraToggle(false, "Off until you turn it on");
             setStep("scan");
             renderAll();
             showToast("Room reset.");
         }
 
         document.getElementById("scanBtn").addEventListener("click", scanRoom);
+        document.getElementById("cameraToggle").addEventListener("change", toggleCameraAccess);
         document.querySelectorAll(".launch-app").forEach(button => {
             button.addEventListener("click", () => openApp());
         });
