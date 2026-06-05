@@ -852,11 +852,7 @@
                 return;
             }
 
-            const name = validatePlayerName();
-            if (!name) {
-                syncCameraToggle(false, "Add your name first");
-                return;
-            }
+            const name = getPlayerName();
 
             els.cameraToggle.disabled = true;
             els.scanStatus.textContent = "Turning camera on...";
@@ -866,7 +862,9 @@
             try {
                 await requestCameraStream();
                 els.scanStatus.textContent = "Camera on";
-                els.scanNote.textContent = `Camera is on, ${name}. Press Request Camera + Scan when the room is in view.`;
+                els.scanNote.textContent = name
+                    ? `Camera is on, ${name}. Press Scan Room when the room is in view.`
+                    : "Camera is on. Enter your investigator name, then press Scan Room when the room is in view.";
                 setCameraPrompt("active", "Camera on", "Live preview is ready. Keep the room in view and start the scan.");
                 document.getElementById("scanBtn").textContent = state.scanned ? "Re-scan Room" : "Scan Room";
             } catch (error) {
