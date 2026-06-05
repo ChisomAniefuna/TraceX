@@ -687,23 +687,26 @@
                 return null;
             }
             const canvas = document.createElement("canvas");
-            canvas.width = els.camera.videoWidth;
-            canvas.height = els.camera.videoHeight;
+            const maxWidth = 960;
+            const scale = Math.min(1, maxWidth / els.camera.videoWidth);
+            canvas.width = Math.round(els.camera.videoWidth * scale);
+            canvas.height = Math.round(els.camera.videoHeight * scale);
             const context = canvas.getContext("2d");
             context.drawImage(els.camera, 0, 0, canvas.width, canvas.height);
             const signature = analyzeCameraFrame(canvas);
+            const imageDataUrl = canvas.toDataURL("image/jpeg", 0.82);
             if (state.imageUrl) {
                 URL.revokeObjectURL(state.imageUrl);
                 state.imageUrl = "";
             }
-            els.previewImage.src = canvas.toDataURL("image/png");
+            els.previewImage.src = imageDataUrl;
             els.previewImage.classList.add("active");
             els.camera.classList.remove("active");
             state.stream.getTracks().forEach(track => track.stop());
             state.stream = null;
             syncCameraToggle(false, "Off after capture");
             state.scanSource = "Camera frame";
-            return signature;
+            return { signature, imageDataUrl };
         }
 
         async function requestCameraStream() {
@@ -806,14 +809,16 @@
                 document.getElementById("scanBtn").textContent = "Scanning...";
 
                 await new Promise(resolve => window.setTimeout(resolve, 1700));
-                const signature = captureCameraFrame();
-                if (!signature) {
+                const capturedFrame = captureCameraFrame();
+                if (!capturedFrame) {
                     throw new Error("Camera did not produce a frame.");
                 }
+                const { signature, imageDataUrl } = capturedFrame;
                 const seed = hashText(`${name}|${signature.brightness}|${signature.contrast}|${Date.now()}`);
                 const backendScan = await postJsonOptional("/api/scan", {
                     playerName: name,
-                    signature
+                    signature,
+                    imageDataUrl
                 });
                 const detected = backendScan && Array.isArray(backendScan.objects)
                     ? backendScan.objects
@@ -823,14 +828,18 @@
                     pick(EXTRA_OBJECTS, seed, 3)
                 ];
                 state.inventory = unique([...detected, ...additions]).slice(0, 10);
-                state.scanSource = `${name}'s camera scan`;
+                state.scanSource = backendScan && backendScan.source === "openai"
+                    ? `${name}'s OpenAI vision scan`
+                    : `${name}'s camera scan`;
                 state.scanTime = new Date();
                 state.scanned = true;
                 els.sceneFrame.classList.remove("scanning");
                 document.getElementById("scanBtn").disabled = false;
                 document.getElementById("scanBtn").textContent = "Re-scan Room";
                 renderAll();
-                showToast(`${state.inventory.length} room objects detected.`);
+                showToast(backendScan && backendScan.source === "openai"
+                    ? `${state.inventory.length} room objects detected with OpenAI Vision.`
+                    : `${state.inventory.length} room objects detected.`);
             } catch (error) {
                 stopCameraStream("Permission still off");
                 const cameraMessage = describeCameraError(error);

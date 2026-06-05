@@ -1,13 +1,17 @@
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import json
+import os
 import random
 import time
+import urllib.error
+import urllib.request
 
 
 ROOT = Path(__file__).resolve().parents[1]
 HOST = "127.0.0.1"
 PORT = 8000
+OPENAI_VISION_MODEL = os.environ.get("OPENAI_VISION_MODEL", "gpt-4.1-mini")
 
 DETECTABLE_OBJECTS = [
     "desk",
@@ -172,7 +176,7 @@ def clue_for_object(obj):
     }
 
 
-def detect_objects(payload):
+def procedural_detect_objects(payload):
     signature = payload.get("signature") or {}
     brightness = float(signature.get("brightness") or 100)
     contrast = float(signature.get("contrast") or 40)
@@ -191,6 +195,109 @@ def detect_objects(payload):
         pick(EXTRA_OBJECTS, rng),
     ]
     return unique(detected)[:10]
+
+
+def extract_response_text(response):
+    if response.get("output_text"):
+        return response["output_text"]
+    chunks = []
+    for item in response.get("output", []):
+        for content in item.get("content", []):
+            if content.get("type") in ["output_text", "text"] and content.get("text"):
+                chunks.append(content["text"])
+    return "\n".join(chunks).strip()
+
+
+def parse_json_text(text):
+    if not text:
+        return {}
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.strip("`").strip()
+        if cleaned.lower().startswith("json"):
+            cleaned = cleaned[4:].strip()
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    if start >= 0 and end >= start:
+        cleaned = cleaned[start:end + 1]
+    return json.loads(cleaned)
+
+
+def normalize_detected_objects(values):
+    objects = []
+    for value in values or []:
+        label = str(value).strip().lower()
+        label = "".join(char for char in label if char.isalnum() or char in [" ", "-"])
+        label = " ".join(label.replace("-", " ").split())
+        if 2 <= len(label) <= 32:
+            objects.append(label)
+    return unique(objects)[:12]
+
+
+def openai_detect_objects(payload):
+    api_key = os.environ.get("OPENAI_API_KEY")
+    image_data_url = payload.get("imageDataUrl")
+    if not api_key or not image_data_url or not image_data_url.startswith("data:image/"):
+        return None
+
+    prompt = (
+        "You are TRACE's room scanner. Analyze the room photo and return only strict JSON with "
+        "this shape: {\"objects\":[\"object name\"],\"sceneSummary\":\"short room summary\","
+        "\"clueCandidates\":[\"object name\"]}. List 5 to 12 visible physical room objects. "
+        "Use common nouns, avoid brand names, do not identify people or faces, and prefer objects "
+        "that could become mystery evidence."
+    )
+    request_body = {
+        "model": OPENAI_VISION_MODEL,
+        "input": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": prompt},
+                    {"type": "input_image", "image_url": image_data_url, "detail": "low"},
+                ],
+            }
+        ],
+    }
+    request = urllib.request.Request(
+        "https://api.openai.com/v1/responses",
+        data=json.dumps(request_body).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=25) as response:
+        data = json.loads(response.read().decode("utf-8"))
+
+    parsed = parse_json_text(extract_response_text(data))
+    objects = normalize_detected_objects(parsed.get("objects"))
+    if len(objects) < 3:
+        return None
+    return {
+        "objects": objects,
+        "source": "openai",
+        "sceneSummary": str(parsed.get("sceneSummary") or "").strip()[:240],
+        "clueCandidates": normalize_detected_objects(parsed.get("clueCandidates"))[:5],
+        "model": OPENAI_VISION_MODEL,
+    }
+
+
+def detect_scan(payload):
+    try:
+        vision_result = openai_detect_objects(payload)
+        if vision_result:
+            return vision_result
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
+        pass
+    return {
+        "objects": procedural_detect_objects(payload),
+        "source": "demo",
+        "sceneSummary": "",
+        "clueCandidates": [],
+        "model": "",
+    }
 
 
 def create_case(payload):
@@ -256,7 +363,7 @@ class TraceHandler(SimpleHTTPRequestHandler):
         try:
             payload = self.read_json()
             if self.path == "/api/scan":
-                self.send_json({"objects": detect_objects(payload)})
+                self.send_json(detect_scan(payload))
             elif self.path == "/api/case":
                 self.send_json({"caseData": create_case(payload)})
             else:
